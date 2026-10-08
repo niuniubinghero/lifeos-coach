@@ -1,0 +1,26 @@
+# 回归测试输出 / 临时产物
+.regress*.txt
+.tmp_*.md
+.testdata_backup/
+
+# 导出报告（每次都不一样，不入库）
+report*.md
+*.local.md
+
+# 编辑器 / 系统
+__pycache__/
+*.pyc
+.DS_Store
+Thumbs.db
+
+# 注意：data/corpus.json **入库**。
+# 它只有 335 KB 元数据（无正文），入库是为了 clone 下来就能用，不用先装上游。
+# 上游索引更新后重建：python3 scripts/lifeos.py corpus build
+
+# 注意：档案（profile.json / *.jsonl / state.json）**绝不入库**。
+# 它们在 LIFEOS_HOME（默认 ~/.workbuddy/lifeos/），本来就不在本目录；
+# 这里列出来是防止有人手动拷回来时误提交。
+profile.json
+state.json
+daily.jsonl
+decisions.jsonl
