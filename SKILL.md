@@ -56,7 +56,7 @@ L1  lifeos（教练层，本项目，可写）
 
 - 「没填孩子」≠「没有孩子」
 - 空值默认 `strict=True` 拦下
-- 想看全貌用 `lifeos domain <id> --no-strict`
+- 想看全貌用 `lifeos domain <id>`（不适用项会标注 `[不适用]`）
 
 已验证：画像填 `children=无 elderly=无` 后，相关条目正确从优先清单消失。
 
@@ -94,7 +94,6 @@ calibrate ── 自称把握 vs 实际命中率 → 校准度
 ### 回答一个具体的生活决策 —— 先检索，再对账
 
 ```bash
-python3 scripts/lifeos.py find "辞职" -k 5        # 找书里的判据（走上游 CLI）
 python3 scripts/lifeos.py domain money            # 看金钱域全貌
 python3 scripts/lifeos.py due                     # 该复查哪些条目
 ```
@@ -187,8 +186,12 @@ python3 scripts/lifeos.py forget 2026-09-12#001
 
 ```bash
 python3 scripts/lifeos.py doctor      # 知识库命中哪个副本、索引在不在、档案状态
-python3 scripts/lifeos.py corpus audit --key 18.2   # 单条为什么进这个桶
+python3 scripts/lifeos.py corpus audit --item 18.2   # 单条为什么进这个桶
+python3 scripts/lifeos.py corpus audit --bucket daily  # 整个桶扫一遍
 ```
+
+`audit --item` 会打印：桶 / 生活域 / 口径 / 等级 / 权重 / 人群限定 / 争议标记 /
+分类依据 / 人工裁决理由。分类有疑问时先看这个。
 
 索引过期（上游更新了）就重建：
 ```bash
