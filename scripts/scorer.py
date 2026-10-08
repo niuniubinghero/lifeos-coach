@@ -151,8 +151,10 @@ def domain_detail(domain_id, strict=False):
                 continue
             rows.append((b, it, ok, why))
     rows.sort(key=lambda x: -x[1]['weight'])
+    # done / answered 都返回集合，调用方要in 判断
     return {'domain': d, 'items': rows,
-            'done': len(done), 'answered': answered}
+            'done': done, 'answered': answered,
+            'counts': {'done': len(done), 'answered': len(answered)}}
 
 
 def unresolved_domains(prof):

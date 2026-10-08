@@ -190,11 +190,54 @@ def audit(bucket, limit=30):
         print(f"          依据：{x['rule']}")
 
 
+def audit_item(key):
+    """单条：为什么进了这个桶 —— 排查分类错误用。"""
+    c = load()
+    meta = next((x for arr in c['buckets'].values() for x in arr
+                 if x['key'] == key), None)
+    if not meta:
+        print(f'{key} 不在索引里')
+        return
+    print(f"{meta['key']}  {meta['title']}")
+    print(f"桶          {find_bucket(c, key)}")
+    print(f"生活域      {meta['domain']}")
+    print(f"口径        {meta['caliber']}")
+    print(f"等级/性价比 {meta['level']} / {meta['ratio']}  权重 {meta['weight']}")
+    if meta['cond']:
+        print(f"人群限定    {meta['cond']}   ← 画像未确认时 strict 模式会拦下")
+    if meta['dispute']:
+        print('争议        书里标注有争议，别当定论')
+    print(f"分类依据    {meta['rule']}")
+
+    ov = load_overrides()
+    if key in ov:
+        print(f"人工裁决    {ov[key].get('reason', '(无说明)')}")
+
+
+def find_bucket(c, key):
+    for b, arr in c['buckets'].items():
+        if any(x['key'] == key for x in arr):
+            return b
+    return '?'
+
+
+def load_overrides():
+    import json as _json
+    p = os.path.join(os.path.dirname(os.path.dirname(
+        os.path.abspath(__file__))), 'data', 'overrides.json')
+    if not os.path.exists(p):
+        return {}
+    with open(p, encoding='utf-8') as f:
+        return _json.load(f)
+
+
 def main():
     sys.stdout.reconfigure(encoding='utf-8')
     ap = argparse.ArgumentParser()
     ap.add_argument('cmd', choices=['build', 'audit', 'stats'])
-    ap.add_argument('--audit', dest='audit_bucket')
+    ap.add_argument('--audit', dest='audit_bucket',
+                    help='按桶审计，如 --audit daily')
+    ap.add_argument('--item', help='审计单条，如 --item 18.2')
     ap.add_argument('-k', type=int, default=30)
     args = ap.parse_args()
 
@@ -206,7 +249,10 @@ def main():
         for b, arr in p['buckets'].items():
             print(f'  {b:<10} {len(arr):>4} 条')
     elif args.cmd == 'audit':
-        audit(args.audit_bucket or 'daily', args.k)
+        if args.item:
+            audit_item(args.item)
+        else:
+            audit(args.audit_bucket or 'daily', args.k)
     else:
         kb = kb_adapter.kb_stats()
         c = load()

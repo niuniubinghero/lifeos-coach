@@ -49,7 +49,10 @@ def cmd_corpus(args):
             print(f'  {b:<10} {len(arr):>4} 条')
         return 0
     if args.action == 'audit':
-        corpus.audit(args.bucket or 'daily', args.k)
+        if args.item:
+            corpus.audit_item(args.item)
+        else:
+            corpus.audit(args.bucket or 'daily', args.k)
         return 0
     print(json.dumps({
         'upstream': kb_adapter.kb_stats(),
@@ -410,7 +413,8 @@ def main():
 
     a = sub.add_parser('corpus')
     a.add_argument('action', choices=['build', 'audit', 'stats'])
-    a.add_argument('--bucket'); a.add_argument('-k', type=int, default=30)
+    a.add_argument('--bucket'); a.add_argument('--item')
+    a.add_argument('-k', type=int, default=30)
     a.set_defaults(fn=cmd_corpus)
 
     args = ap.parse_args()
