@@ -1,4 +1,4 @@
-# lifeos
+# lifeos-coach
 
 > 按《高性价比人生指南》的标准做长期生活教练。
 > 记你的决策，按四口径给你打分，到期跟你对账。
@@ -39,8 +39,8 @@ L0  how-to-live-better（知识层，只读）
 ## 安装
 
 ```bash
-git clone <this repo> lifeos
-cd lifeos
+git clone https://github.com/niuniubinghero/lifeos-coach.git
+cd lifeos-coach
 python3 scripts/lifeos.py doctor
 ```
 
@@ -177,7 +177,7 @@ calibrate ──► 自称把握 vs 实际命中率
 **上游更新了条目** → 重建索引：
 ```bash
 python3 scripts/lifeos.py corpus build
-python3 scripts/lifeos.py corpus audit --key 18.2   # 抽查分类合不合理
+python3 scripts/lifeos.py corpus audit --item 18.2   # 单条：为什么进这个桶
 ```
 
 **改了分类规则** → 一并更新 `data/overrides.json`，并在提交信息里写清 why。
