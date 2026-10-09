@@ -87,17 +87,89 @@ def cmd_doctor(args):
 
 # ---------------------------------------------------------------- 问 / 答
 def cmd_ask(args):
-    if args.date:
-        d = dt.date.fromisoformat(args.date)
-    else:
-        d = dt.date.today()
-    q = scheduler.today_question(d, force_rotate=args.next)
+    d = dt.date.fromisoformat(args.date) if args.date else dt.date.today()
+    q = scheduler.today_question(d, skip=args.skip)
     if not args.date:
         scheduler.mark_asked(q['key'])
-    q['reply_hint'] = (
-        f"把「{q['title']}」转成今天能一句话回答的问题，让用户报个数或说做了/没做。"
-        f"不要复述条文，控制在 80 字以内。")
+    q['reply_hint'] = ASK_HINT
+    q['ask_examples'] = ask_examples(q)
+    # 静默兜底时（画像太空只能全放行）要提醒 agent 可能问错人
+    if q.get('unconfirmed'):
+        q['may_not_apply'] = True
     out(q)
+
+
+# 出题时怎么说才像人在聊天。
+# 脚本不猜具体句子（猜出来的都是公文腔），只给结构和素材。
+ASK_HINT = (
+    '这条是每日一问，只问一句。\n'
+    '念给用户听的时候：\n'
+    '1. 先用日常说法把这事说出来，素材在 plain 里，别念 title\n'
+    '2. 顺一句「为什么问这个」——因为这条能救命/能省钱，不是要考试\n'
+    '3. 给一个用户能直接答的入口\n'
+    '\n'
+    '注意：这条对某些人才适用。用户明显不属于这里的情况就别硬问，'
+    '换一条或者直接说「这条对你用不上，跳过」。\n'
+    '\n'
+    '反面例子：「你现在是什么情况？」——公文腔，而且用户不一定答得上来。\n'
+    '正面例子：「今天问个小的：坚果吃了没？……你今天吃了吗？」\n'
+    '整体三两句，别加客套话，别用「建议您」「根据指南」这种腔调。'
+)
+
+
+def ask_examples(q):
+    """不生成句子，只给「怎么问」的结构化提示。
+
+    之前按域/桶模板自动造过句，产出的全是「你现在是什么情况？」
+    这种公文腔，而且对「不抽烟的人」这类情况根本答不了。
+    脚本猜不出自然口语，这活交给 agent —— 它看得到 plain/cost/why。
+    """
+    cal = q.get('caliber_key', q.get('caliber', ''))   # 原始 key：死亡率/时间/金钱/自由
+    hint = []
+
+    # 从 cost 挖难点，这是最自然的追问方向
+    cost = q.get('cost') or ''
+    if cost:
+        if '不占时间' in cost or '不占钱' in cost or '不花钱' in cost:
+            # 注意：cost 里写「不占时间」但可能仍然花钱（坚果那条一年两三百），
+            # 所以只在真的提到「不花钱/不占钱」时才说白不花
+            if '不花钱' in cost or '不占钱' in cost:
+                hint.append('这条几乎不花钱，可以说「不花你钱」，把门槛降下来。')
+            else:
+                hint.append(f'这条成本是「{cost[:36]}」——'
+                            f'先把代价说清楚，用户会自己判断值不值。')
+        i = cost.find('难')
+        if i >= 0:
+            hint.append(f'难点是这句「{cost[i:i + 50]}」。'
+                        f'顺着难点问最自然，比如「这块你是怎么处理的」。')
+
+    if cal == '死亡率':
+        hint.append('问行为，不问状态。「今天做了吗」比「你身体怎么样」好答得多。')
+    elif cal == '金钱':
+        hint.append('问具体数字或「有没有」，别问「你怎么规划」。')
+    elif cal == '时间':
+        hint.append('这类最容易变成空话。问昨天/今天具体怎么过的。')
+    elif cal == '自由':
+        hint.append('问场景：「万一…你怎么办」。这类条目本身就是在问预案。')
+
+    if q.get('dispute'):
+        hint.append('这条书里标了有争议，别说成定论，用「书里有两种说法」的口吻。')
+
+    cond = q.get('unconfirmed') or []
+    if cond:
+        hint.append(f'这条涉及 {",".join(cond)}，画像里还没确认。'
+                    f'如果用户不属于这些情况就别问——'
+                    f'问完得到「没有」就到此为止，别往下追。')
+
+    return {
+        'topic': q.get('title', ''),
+        'plain_material': (q.get('plain') or '')[:200],
+        'why_material': (q.get('why') or '')[:160],
+        'cost_material': cost[:120],
+        'how_to_ask': hint,
+        'structure': '这事是什么（一句）→ 为什么值得问（一句）'
+                     '→ 你现在怎么样（一个能直接答的问题）',
+    }
 
 
 def cmd_answer(args):
@@ -364,7 +436,9 @@ def main():
 
     sub.add_parser('doctor').set_defaults(fn=cmd_doctor)
 
-    a = sub.add_parser('ask'); a.add_argument('--date'); a.add_argument('--next', action='store_true')
+    a = sub.add_parser('ask'); a.add_argument('--date')
+    a.add_argument('--skip', type=int, default=0,
+                   help='往后挪几条（预览第 2/3 条用），不加就是今天这条')
     a.set_defaults(fn=cmd_ask)
     a = sub.add_parser('answer')
     a.add_argument('key'); a.add_argument('content')

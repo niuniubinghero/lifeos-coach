@@ -21,7 +21,7 @@ POOL_SIZE = 18          # 轮换池大小
 WEEKDAYS = ['周一', '周二', '周三', '周四', '周五', '周六', '周日']
 
 
-def today_question(date=None, force_rotate=False):
+def today_question(date=None, skip=0):
     """取今天该问的那一条。返回完整可直接提问的 dict。"""
     c = corpus.load()
     prof = store.get_profile()
@@ -29,18 +29,25 @@ def today_question(date=None, force_rotate=False):
 
     pool = []
     for it in c['buckets']['daily']:
-        ok, _ = is_applicable(it, prof, strict=True)
+        ok, why = is_applicable(it, prof, strict=True)
         if ok:
             pool.append(it)
     if not pool:                      # 画像没确认太多，全部放行兜底
         pool = list(c['buckets']['daily'])
+    # 带人群限定的条目进来时记下是哪些 —— 供出题时判断「这条对用户适不适用」
+    pool = [dict(it, _unconfirmed=[w for w in
+                                   is_applicable(it, prof, strict=True)[1]
+                                   if '未确认' in w])
+            for it in pool]
 
     pool.sort(key=lambda x: (-x['weight'], x['key']))
     pool = pool[:POOL_SIZE] if len(pool) > POOL_SIZE else pool
 
     idx = (d - BASE_DATE).days % len(pool)
-    if force_rotate:
-        idx = (idx + 1) % len(pool)
+    # skip 是「往后挪几条」—— 用来给用户预览第2/3 条是什么，
+    # 不是布尔开关（重复传 --next 也不该只挪一格）。
+    if skip:
+        idx = (idx + int(skip)) % len(pool)
     meta = pool[idx]
 
     # 条目详情现场从上游取 —— lifeos 本地不存正文
@@ -53,17 +60,19 @@ def today_question(date=None, force_rotate=False):
         'cite': f"第 {meta['sec']} 节第 {meta['no']} 条",
         'sec_name': full.get('sec_name', ''),
         'title': meta['title'],
+        # plain 就是上游写的「说人话」，是最口语化的原料，
+        # 出题时优先用它，别把 title 当台词念。
+        'plain': (full.get('plain') or '')[:200],
+        'cost': full.get('cost', ''),
+        'why': (full.get('benefit') or '')[:240],
         'domain': meta['domain'],
         'domain_name': DOMAIN_BY_ID.get(meta['domain'], {}).get('name', ''),
         'caliber': CALIBER_LABEL.get(meta['caliber'], meta['caliber']),
+        'caliber_key': meta['caliber'],      # 原始 key，脚本按它分支更稳
         'level': meta['level'],
         'ratio': meta['ratio'],
         'dispute': meta['dispute'],
-        'ask': meta['title'],
-        'plain': (full.get('plain') or '')[:160],
-        'cost': full.get('cost', ''),
-        'why': (full.get('benefit') or '')[:220],
-        'note': (full.get('note') or '')[:300],
+        'unconfirmed': meta.get('_unconfirmed', []),
         'pool_size': len(pool),
         'answered_today': _answered_on(d),
         'last_asked': store.load_json('state.json', {}).get('last_asked'),
