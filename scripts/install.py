@@ -77,14 +77,40 @@ def _compare(src, dst):
     return all_same, diff
 
 
+def _rmtree_safe(d):
+    """删目录。
+
+    不用 shutil.rmtree —— 部分环境会把它的删除动作重定向到系统回收站 API，
+    在没有桌面 shell 的场景下会抛 SHFileOperationW 失败。
+    逐文件 unlink + 逐层 rmdir，纯文件系统调用，任何环境都能跑。
+    """
+    if not os.path.isdir(d):
+        return
+    for base, dirs, files in os.walk(d, topdown=False):
+        for f in files:
+            p = os.path.join(base, f)
+            try:
+                os.unlink(p)
+            except FileNotFoundError:
+                pass
+        for sub in dirs:
+            try:
+                os.rmdir(os.path.join(base, sub))
+            except OSError:
+                pass
+    try:
+        os.rmdir(d)
+    except OSError:
+        pass
+
+
 def install(dst_root, force=False):
     dst = os.path.join(dst_root, SKILL_NAME)
     installed, diff, _, _ = status_of(dst_root)
     if installed and not diff and not force:
         return 'skip'
-    if os.path.isdir(dst):
-        shutil.rmtree(dst)
-    os.makedirs(dst)
+    _rmtree_safe(dst)
+    os.makedirs(dst, exist_ok=True)
     for item in PKG:
         s = os.path.join(ROOT, item)
         if not os.path.exists(s):
